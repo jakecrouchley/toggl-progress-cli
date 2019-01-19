@@ -1,0 +1,24 @@
+{
+  "name": "toggl-progress-cli",
+  "version": "1.0.0",
+  "description": "Manage Toggl progress and estimates from the command line",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jakecrouchley/toggl-progress-cli.git"
+  },
+  "keywords": [
+    "toggl",
+    "time",
+    "tracking"
+  ],
+  "author": "Jake Crouchley <jakecrouchley@gmail.com> (http://crouchley.nz)",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jakecrouchley/toggl-progress-cli/issues"
+  },
+  "homepage": "https://github.com/jakecrouchley/toggl-progress-cli#readme"
+}
