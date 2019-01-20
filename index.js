@@ -3,19 +3,23 @@ const axios = require('axios')
 const inquirer = require('inquirer')
 const ora = require('ora');
 
-var spinner = ora('Loading Workspaces').start();
+var spinner = ora();
 
 var program = require('commander');
+
+var ProgressBar = require('ascii-progress');
 
 program
   .version('1.0.0', '-v, --version')
   .description('Get or set estimates for Toggl projects, and track progress')
   .option('-p, --key', 'API Key')
+  .option('-d, --start-date', 'Starting date (YYYY-MM-DD)')
 program.parse(process.argv);
 
 var hostname = 'http://localhost:3000';
 
 var getWorkspace = () => {
+    spinner.start('Loading Workspaces');
     return new Promise((resolve, reject) => {
         axios({
             method: "get",
@@ -53,7 +57,7 @@ var getWorkspace = () => {
     })
 }
 
-var getClients = (workspace_id) => {
+var getClients = (workspace_id, start_date) => {
     spinner.start('Loading Clients');
     return new Promise((resolve, reject) => {
         axios({
@@ -84,7 +88,7 @@ var getClients = (workspace_id) => {
             ]
             inquirer.prompt(questions).then((answers) => {
                 var client = answers.client;
-                getClient(client.id, client.name).then((client) => {
+                getClient(client.id, client.name, workspace_id, start_date).then((client) => {
                     resolve(client);
                 }).catch((error) => {
                     console.error(error);
@@ -99,12 +103,15 @@ var getClients = (workspace_id) => {
     })
 }
 
-var getClient = (client_id, client_name) => {
+var getClient = (client_id, client_name, workspace_id, start_date) => {
     spinner.start('Loading info for '+client_name);
     return new Promise((resolve, reject) => {
         axios({
             method: "get",
-            url: hostname+"/client/"+client_id,
+            url: hostname+"/workspace/"+workspace_id+"/client/"+client_id,
+            params: {
+                start_date : start_date
+            },
             headers: {
                 "content-type": "application/json"
             }
@@ -185,51 +192,81 @@ var updateEstimate = (client_id, project_name) => {
     });
 }
 
-getWorkspace().then((workspace) => {
-    getClients(workspace).then((client) => {
-        var choices = client.projects.map((project) => {
-            return project.name
-        })
-        var questions = [
-            {
-                type: 'list',
-                name: 'project',
-                choices: choices,
-                message: 'Please select a Project'
+var questions = [
+    {
+        type: 'input',
+        name: 'date',
+        validate: function(value) {
+            var pass = value.match(
+              /^\d{4}-\d{2}-\d{2}$/i
+            );
+            if (pass) {
+              return true;
             }
-        ]
-        inquirer.prompt(questions).then((answers) => {
-            var project = answers.project;
-            getEstimate(client.id, project).then((project) => {
-                if (!project.estimate) {
-                    var questions = [
-                        {
-                            type: 'confirm',
-                            name: 'add_estimate',
-                            message: 'No estimate found, would you like to set one?'
-                        }
-                    ]
-                    inquirer.prompt(questions).then((answers) => {
-                        if (answers.add_estimate) {
-                            updateEstimate(client.id, project.name);
-                        } else {
-                            return;
-                        }
-                    })
-                } else {
-                    var toggl_project = client.projects.find((value) => {
-                        return value.name === project.name;
-                    });
-                    var percentage = ((toggl_project.effort/1000/60/60)/project.estimate)*100;
-                    console.log(percentage);
-                    
+      
+            return 'Please enter a date in the format YYYY-MM-DD';
+        },
+        message: 'Please enter a starting date (YYYY-MM-DD)'
+    }
+]
+inquirer.prompt(questions).then((answers) => {
+    var start_date = answers.date;
+    getWorkspace().then((workspace) => {
+        getClients(workspace, start_date).then((client) => {
+            var choices = client.projects.map((project) => {
+                return project.name
+            })
+            var questions = [
+                {
+                    type: 'list',
+                    name: 'project',
+                    choices: choices,
+                    message: 'Please select a Project'
                 }
-            });
-        })
+            ]
+            inquirer.prompt(questions).then((answers) => {
+                var project = answers.project;
+                getEstimate(client.id, project).then((project) => {
+                    if (!project.estimate) {
+                        var questions = [
+                            {
+                                type: 'confirm',
+                                name: 'add_estimate',
+                                message: 'No estimate found, would you like to set one?'
+                            }
+                        ]
+                        inquirer.prompt(questions).then((answers) => {
+                            if (answers.add_estimate) {
+                                updateEstimate(client.id, project.name);
+                            } else {
+                                return;
+                            }
+                        })
+                    } else {
+                        var toggl_project = client.projects.find((value) => {
+                            return value.name === project.name;
+                        });
+                        var percentage = ((toggl_project.effort/1000/60/60)/project.estimate)*100;
+                        var bar = new ProgressBar({
+                            schema: '╢:bar╟ :percent :current hrs/:total estimated',
+                            blank: '░',
+                            filled: '█',
+                            total: project.estimate
+                        })
+                        bar.update(percentage/100, {
+                            current : (toggl_project.effort/1000/60/60)
+                        });
+                        
+                    }
+                });
+            })
+        }).catch((error) => {
+            console.error(error);
+        });
     }).catch((error) => {
         console.error(error);
-    });
-}).catch((error) => {
-    console.error(error);
+    })
 })
+
+
 

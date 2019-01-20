@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/jakecrouchley/toggl-progress-cli#readme",
   "dependencies": {
+    "ascii-progress": "^1.0.5",
     "axios": "^0.18.0",
     "commander": "^2.19.0",
     "inquirer": "^6.2.1",
