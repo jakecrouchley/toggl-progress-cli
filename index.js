@@ -7,8 +7,6 @@ var spinner = ora('Loading Workspaces').start();
 
 var program = require('commander');
 
-require('dotenv').config()
-
 program
   .version('1.0.0', '-v, --version')
   .description('Get or set estimates for Toggl projects, and track progress')
