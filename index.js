@@ -246,15 +246,18 @@ inquirer.prompt(questions).then((answers) => {
                         var toggl_project = client.projects.find((value) => {
                             return value.name === project.name;
                         });
-                        var percentage = ((toggl_project.effort/1000/60/60)/project.estimate)*100;
+                        var current_hours = (toggl_project.effort/1000/60/60);
+                        var percentage = (current_hours/project.estimate)*100;
                         var bar = new ProgressBar({
-                            schema: '╢:bar╟ :percent :current hrs/:total estimated',
+                            schema: '╢:bar╟ :percent :current hrs/:total estimated ($:cost/$:price)',
                             blank: '░',
                             filled: '█',
                             total: project.estimate
                         })
                         bar.update(percentage/100, {
-                            current : (toggl_project.effort/1000/60/60)
+                            current : current_hours,
+                            cost : parseFloat(current_hours*project.rate).toFixed(0),
+                            price : parseFloat(project.estimate*project.rate).toFixed(0)
                         });
                         
                     }
