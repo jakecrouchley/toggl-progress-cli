@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "progress": "./index.js"
+    "progress": "./index.js",
+    "progress-estimate": "./estimate.js"
   },
   "repository": {
     "type": "git",

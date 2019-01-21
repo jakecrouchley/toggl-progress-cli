@@ -12,9 +12,11 @@ var ProgressBar = require('ascii-progress');
 
 program
   .version('1.0.0', '-v, --version')
-  .description('Get or set estimates for Toggl projects, and track progress')
-  .option('-p, --key', 'API Key')
-  .option('-d, --start-date', 'Starting date (YYYY-MM-DD)')
+  .command('estimate <project>')
+  .action(() => {
+      console.log("Hello");
+  })
+  .description('View progress on Toggl projects')
 program.parse(process.argv);
 
 const logger = winston.createLogger({
