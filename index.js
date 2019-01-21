@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 const axios = require('axios')
 const inquirer = require('inquirer')
-const ora = require('ora');
+const ora = require('ora')
+const winston = require('winston')
 
 var spinner = ora();
 
@@ -16,7 +17,85 @@ program
   .option('-d, --start-date', 'Starting date (YYYY-MM-DD)')
 program.parse(process.argv);
 
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.json(),
+    defaultMeta: {service: 'user-service'},
+    transports: [
+        //
+        // - Write to all logs with level `info` and below to `combined.log` 
+        // - Write all logs error (and below) to `error.log`.
+        //
+        new winston.transports.File({ filename: 'error.log', level: 'error' }),
+        new winston.transports.File({ filename: 'combined.log' })
+    ]
+});
+
+//
+// If we're not in production then log to the `console` with the format:
+// `${info.level}: ${info.message} JSON.stringify({ ...rest }) `
+// 
+/*if (process.env.NODE_ENV !== 'production') {
+logger.add(new winston.transports.Console({
+    format: winston.format.simple()
+}));
+}*/
+
 var hostname = 'http://localhost:3000';
+
+var today = new Date();
+today.setFullYear(today.getFullYear()-1);
+var last_year_date_string = formatDate(today);
+
+var questions = [
+    {
+        type: 'input',
+        name: 'date',
+        validate: function(value) {
+            var pass = value.match(
+              /^\d{4}-\d{2}-\d{2}$/i
+            );
+            if (pass) {
+              return true;
+            }
+      
+            return 'Please enter a date in the format YYYY-MM-DD';
+        },
+        default: last_year_date_string,
+        message: 'Please enter a starting date (YYYY-MM-DD)'
+    }
+]
+var run = () => {
+    inquirer.prompt(questions).then((answers) => {
+        var start_date = answers.date;
+        getWorkspace().then((workspace) => {
+            getClients(workspace, start_date).then((client) => {
+                promptProjects(client);
+            }).catch((error) => {
+                if (error.code === 'ECONNREFUSED') {
+                    logger.error(error);
+                    console.log("\nCould not connect to server");
+                } else {
+                    logger.error(error);
+                    console.log("Finished with error, please see error log");
+                }
+                spinner.stop();
+                return 0;
+            });
+        }).catch((error) => {
+            if (error.code === 'ECONNREFUSED') {
+                logger.error(error);
+                console.log("\nCould not connect to server");
+            } else {
+                logger.error(error);
+                console.log("Finished with error, please see error log");
+            }
+            spinner.stop();
+            return 0;
+        })
+    })
+}
+run();
 
 var getWorkspace = () => {
     spinner.start('Loading Workspaces');
@@ -50,7 +129,7 @@ var getWorkspace = () => {
                 
             })
         }).catch((error) => {
-            console.error(error);
+            logger.error(error);
             reject(error);
             return;
         });
@@ -91,13 +170,13 @@ var getClients = (workspace_id, start_date) => {
                 getClient(client.id, client.name, workspace_id, start_date).then((client) => {
                     resolve(client);
                 }).catch((error) => {
-                    console.error(error);
+                    logger.error(error);
                     reject(error);
                 })
             })
         }).catch((error) => {
             spinner.fail('Failed to load Clients');
-            console.error(error);
+            logger.error(error);
             reject(error);
         });
     })
@@ -121,7 +200,7 @@ var getClient = (client_id, client_name, workspace_id, start_date) => {
             resolve(client);
         }).catch((error) => {
             spinner.fail('Failed to load info for '+client_name);
-            console.error(error);
+            logger.error(error);
             reject(error);
         });
     })
@@ -146,7 +225,7 @@ var getEstimate = (client_id, project_name) => {
             resolve(project);
         }).catch((error) => {
             spinner.fail('Failed to load info for '+project_name);
-            console.error(error);
+            logger.error(error);
             reject(error);
         });
     })
@@ -180,96 +259,103 @@ var updateEstimate = (client_id, project_name) => {
                 headers: {
                     "content-type": "application/json"
                 }
-            }).then(() => {
+            }).then((response) => {
                 spinner.stop('Saved info for '+project_name);
-                resolve(true);
+                var project = response.data;
+                resolve(project);
             }).catch((error) => {
                 spinner.fail('Failed to save info for '+project_name);
-                console.error(error);
+                logger.error(error);
                 reject(error);
             });
         })
     });
 }
 
-var questions = [
-    {
-        type: 'input',
-        name: 'date',
-        validate: function(value) {
-            var pass = value.match(
-              /^\d{4}-\d{2}-\d{2}$/i
-            );
-            if (pass) {
-              return true;
-            }
-      
-            return 'Please enter a date in the format YYYY-MM-DD';
-        },
-        message: 'Please enter a starting date (YYYY-MM-DD)'
-    }
-]
-inquirer.prompt(questions).then((answers) => {
-    var start_date = answers.date;
-    getWorkspace().then((workspace) => {
-        getClients(workspace, start_date).then((client) => {
-            var choices = client.projects.map((project) => {
-                return project.name
-            })
-            var questions = [
-                {
-                    type: 'list',
-                    name: 'project',
-                    choices: choices,
-                    message: 'Please select a Project'
-                }
-            ]
-            inquirer.prompt(questions).then((answers) => {
-                var project = answers.project;
-                getEstimate(client.id, project).then((project) => {
-                    if (!project.estimate) {
-                        var questions = [
-                            {
-                                type: 'confirm',
-                                name: 'add_estimate',
-                                message: 'No estimate found, would you like to set one?'
-                            }
-                        ]
-                        inquirer.prompt(questions).then((answers) => {
-                            if (answers.add_estimate) {
-                                updateEstimate(client.id, project.name);
-                            } else {
-                                return;
-                            }
-                        })
-                    } else {
-                        var toggl_project = client.projects.find((value) => {
-                            return value.name === project.name;
-                        });
-                        var current_hours = (toggl_project.effort/1000/60/60);
-                        var percentage = (current_hours/project.estimate)*100;
-                        var bar = new ProgressBar({
-                            schema: '╢:bar╟ :percent :current hrs/:total estimated ($:cost/$:price)',
-                            blank: '░',
-                            filled: '█',
-                            total: project.estimate
-                        })
-                        bar.update(percentage/100, {
-                            current : current_hours,
-                            cost : parseFloat(current_hours*project.rate).toFixed(0),
-                            price : parseFloat(project.estimate*project.rate).toFixed(0)
-                        });
-                        
-                    }
-                });
-            })
-        }).catch((error) => {
-            console.error(error);
-        });
-    }).catch((error) => {
-        console.error(error);
+function formatDate(date) {
+        var month = '' + (date.getMonth() + 1);
+        var day = '' + date.getDate();
+        var year = date.getFullYear();
+
+    if (month.length < 2) month = '0' + month;
+    if (day.length < 2) day = '0' + day;
+
+    return [year, month, day].join('-');
+}
+
+var promptProjects = (client) => {
+    var choices = client.projects.map((project) => {
+        return project.name
     })
-})
+    var questions = [
+        {
+            type: 'list',
+            name: 'project',
+            choices: choices,
+            message: 'Please select a Project',
+        }
+    ]
+    inquirer.prompt(questions).then((answers) => {
+        var project = answers.project;
+        getEstimate(client.id, project).then((project) => {
+            if (!project.estimate) {
+                var questions = [
+                    {
+                        type: 'confirm',
+                        name: 'add_estimate',
+                        message: 'No estimate found, would you like to set one?'
+                    }
+                ]
+                inquirer.prompt(questions).then((answers) => {
+                    if (answers.add_estimate) {
+                        updateEstimate(client.id, project.name).then((project) => {
+                            showResults(client, project);
+                        });
+                    } else {
+                        promptProjects(client);
+                    }
+                })
+            } else {
+                showResults(client, project);
+            }
+        });
+    })
+}
+
+var showResults = (client, project) => {
+    var toggl_project = client.projects.find((value) => {
+        return value.name === project.name;
+    });
+    var current_hours = (toggl_project.effort/1000/60/60);
+    var percentage = (current_hours/project.estimate)*100;
+    var bar = new ProgressBar({
+        schema: '╢:bar╟ :percent :current hrs/:total estimated ($:cost/$:price)',
+        blank: '░',
+        filled: '█',
+        total: project.estimate
+    })
+    bar.update(percentage/100, {
+        current : current_hours,
+        cost : parseFloat(current_hours*project.rate).toFixed(0),
+        price : parseFloat(project.estimate*project.rate).toFixed(0)
+    });
+    console.log('');
+    
+    var questions = [
+        {
+            type: 'confirm',
+            name: 'again',
+            message: 'Check another project?',
+        }
+    ]
+    inquirer.prompt(questions).then((answers) => {
+        if (answers.again) {
+            run();
+        } else {
+            return;
+        }
+    });
+}
 
 
 
