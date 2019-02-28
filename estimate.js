@@ -10,11 +10,6 @@ var program = require('commander');
 
 var ProgressBar = require('ascii-progress');
 
-program
-  .version('1.0.0', '-v, --version')
-  .description('Set and Get estimates on Toggl projects')
-program.parse(process.argv);
-
 const logger = winston.createLogger({
     level: 'info',
     format: winston.format.json(),
@@ -28,3 +23,14 @@ const logger = winston.createLogger({
         new winston.transports.File({ filename: 'combined.log' })
     ]
 });
+
+program
+  .version('1.0.0', '-v, --version')
+  .description('Set and Get estimates on Toggl projects')
+  .command('estimate <dir>')
+  .action(function (dir, cmd) {
+      console.log(dir);
+      console.log(cmd);
+      
+  })
+program.parse(process.argv);

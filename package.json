@@ -8,7 +8,7 @@
   },
   "bin": {
     "progress": "./index.js",
-    "progress-estimate": "./estimate.js"
+    "estimate": "./estimate.js"
   },
   "repository": {
     "type": "git",

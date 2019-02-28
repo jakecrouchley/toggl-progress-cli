@@ -12,10 +12,6 @@ var ProgressBar = require('ascii-progress');
 
 program
   .version('1.0.0', '-v, --version')
-  .command('estimate <project>')
-  .action(() => {
-      console.log("Hello");
-  })
   .description('View progress on Toggl projects')
 program.parse(process.argv);
 
