@@ -3,6 +3,10 @@ const axios = require('axios')
 const inquirer = require('inquirer')
 const ora = require('ora')
 const winston = require('winston')
+const fs = require('fs')
+const homedir = require('os').homedir();
+var path = require('path');
+
 
 var spinner = ora();
 
@@ -33,19 +37,63 @@ const logger = winston.createLogger({
 // If we're not in production then log to the `console` with the format:
 // `${info.level}: ${info.message} JSON.stringify({ ...rest }) `
 // 
-/*if (process.env.NODE_ENV !== 'production') {
-logger.add(new winston.transports.Console({
-    format: winston.format.simple()
-}));
-}*/
+if (process.env.NODE_ENV !== 'production') {
+    logger.add(new winston.transports.Console({
+        format: winston.format.simple()
+    }));
+};
 
 var hostname = 'http://localhost:3000';
+var local_fs_dir_name = '.progress'
+var configDir = path.normalize(`${homedir}/${local_fs_dir_name}`)
+var togglApiKey;
+
+var getApiKey = () => {
+    return new Promise((resolve, reject) => {
+        fs.readFile(`${configDir}/config.json`, (error, data) => {
+            if (error) {
+                if (error.code === "ENOENT") {
+                    inquirer.prompt({
+                        type: 'input',
+                        name: 'api_key',
+                        message: 'Please enter your Toggl API key'
+                    }).then((answers) => {
+                        var starterConfig = {
+                            api_key: answers.api_key
+                        }
+                        fs.mkdir(configDir, (error) => {
+                            if (error && error.code !== "EEXIST") {
+                                logger.error(error);
+                            } else {
+                                fs.writeFile(`${configDir}/config.json`, JSON.stringify(starterConfig), { recursive: true } ,(error) => {
+                                    if (error) {
+                                        logger.error(error);
+                                    } else {
+                                        togglApiKey = answers.api_key;
+                                        resolve();
+                                    }
+                                })
+                            }
+                        })
+                    })
+                } else {
+                    reject(error);
+                }
+            } else {
+                // File exists
+                var config = JSON.parse(data);
+                togglApiKey = config.api_key;
+                resolve();
+            }
+        });
+    })
+}
 
 var today = new Date();
 today.setFullYear(today.getFullYear()-1);
 var last_year_date_string = formatDate(today);
 
-var questions = [
+var startDateQuestion = [
     {
         type: 'input',
         name: 'date',
@@ -64,33 +112,37 @@ var questions = [
     }
 ]
 var run = () => {
-    inquirer.prompt(questions).then((answers) => {
-        var start_date = answers.date;
-        getWorkspace().then((workspace) => {
-            getClients(workspace, start_date).then((client) => {
-                promptProjects(client);
+    getApiKey().then(() => {
+        inquirer.prompt(startDateQuestion).then((answers) => {
+            var start_date = answers.date;
+            getWorkspace().then((workspace) => {
+                getClients(workspace, start_date).then((client) => {
+                    promptProjects(client);
+                }).catch((error) => {
+                    if (error.code === 'ECONNREFUSED') {
+                        logger.error(error);
+                        console.log("\nCould not connect to server");
+                    } else {
+                        logger.error(error.response.data);
+                        console.log(`\n${error.response.data}`);
+                    }
+                    spinner.stop();
+                    return 0;
+                });
             }).catch((error) => {
                 if (error.code === 'ECONNREFUSED') {
                     logger.error(error);
                     console.log("\nCould not connect to server");
                 } else {
-                    logger.error(error);
-                    console.log("Finished with error, please see error log");
+                    logger.error(error.response.data);
+                    console.log(`\n${error.response.data}`);
                 }
                 spinner.stop();
                 return 0;
-            });
-        }).catch((error) => {
-            if (error.code === 'ECONNREFUSED') {
-                logger.error(error);
-                console.log("\nCould not connect to server");
-            } else {
-                logger.error(error);
-                console.log("Finished with error, please see error log");
-            }
-            spinner.stop();
-            return 0;
+            })
         })
+    }, (error) => {
+        logger.error(error);
     })
 }
 run();
@@ -102,7 +154,8 @@ var getWorkspace = () => {
             method: "get",
             url: hostname+"/workspaces",
             headers: {
-                "content-type": "application/json"
+                "content-type": "application/json",
+                "access-key": togglApiKey
             }
         }).then((response) => {
             spinner.succeed('Loaded Workspaces');
@@ -127,7 +180,6 @@ var getWorkspace = () => {
                 
             })
         }).catch((error) => {
-            logger.error(error);
             reject(error);
             return;
         });
@@ -141,7 +193,8 @@ var getClients = (workspace_id, start_date) => {
             method: "get",
             url: hostname+"/clients/"+workspace_id,
             headers: {
-                "content-type": "application/json"
+                "content-type": "application/json",
+                "access-key": togglApiKey
             }
         }).then((response) => {
             spinner.succeed('Loaded Clients');
@@ -190,7 +243,8 @@ var getClient = (client_id, client_name, workspace_id, start_date) => {
                 start_date : start_date
             },
             headers: {
-                "content-type": "application/json"
+                "content-type": "application/json",
+                "access-key": togglApiKey
             }
         }).then((response) => {
             spinner.stop('Loaded info for '+client_name);
