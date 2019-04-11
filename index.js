@@ -17,6 +17,7 @@ var ProgressBar = require('ascii-progress');
 program
   .version('1.0.0', '-v, --version')
   .description('View progress on Toggl projects')
+
 program.parse(process.argv);
 
 const logger = winston.createLogger({
@@ -43,7 +44,7 @@ if (process.env.NODE_ENV !== 'production') {
     }));
 };
 
-var hostname = 'http://localhost:3000';
+var hostname = process.env.NODE_ENV == 'production' || process.argv[2] == 'prod' ? 'https://toggl-progress.herokuapp.com' : 'http://localhost:3000';
 var local_fs_dir_name = '.progress'
 var configDir = path.normalize(`${homedir}/${local_fs_dir_name}`)
 var togglApiKey;
@@ -56,7 +57,7 @@ var getApiKey = () => {
                     inquirer.prompt({
                         type: 'input',
                         name: 'api_key',
-                        message: 'Please enter your Toggl API key'
+                        message: 'Please enter your Toggl API key (see https://toggl.com/app/profile ):'
                     }).then((answers) => {
                         var starterConfig = {
                             api_key: answers.api_key
@@ -112,6 +113,11 @@ var startDateQuestion = [
     }
 ]
 var run = () => {
+
+    if (process.env.NODE_ENV !== 'production' ) {
+        console.log("Running dev version connecting to "+hostname);
+    }
+
     getApiKey().then(() => {
         inquirer.prompt(startDateQuestion).then((answers) => {
             var start_date = answers.date;
@@ -134,8 +140,13 @@ var run = () => {
                     logger.error(error);
                     console.log("\nCould not connect to server");
                 } else {
-                    logger.error(error.response.data);
-                    console.log(`\n${error.response.data}`);
+                    if (error.response) {
+                        logger.error(error.response.data);
+                        console.log(`\n${error.response.data}`);
+                    } else {
+                        logger.error("No response")
+                        logger.error(error)
+                    }
                 }
                 spinner.stop();
                 return 0;
@@ -258,12 +269,12 @@ var getClient = (client_id, client_name, workspace_id, start_date) => {
     })
 }
 
-var getEstimate = (client_id, project_name) => {
+var getProject = (client_id, project_name) => {
     spinner.start('Loading info for '+project_name);
     return new Promise((resolve, reject) => {
         axios({
             method: "get",
-            url: hostname+"/estimate",
+            url: hostname+"/project",
             params: {
                 client_id : client_id,
                 project_name : project_name
@@ -283,7 +294,7 @@ var getEstimate = (client_id, project_name) => {
     })
 }
 
-var updateEstimate = (client_id, project_name) => {
+var updateProject = (client_id, project_name) => {
     return new Promise((resolve, reject) => {
         var questions = [
             {
@@ -300,8 +311,8 @@ var updateEstimate = (client_id, project_name) => {
         inquirer.prompt(questions).then((answers) => {
             spinner.start('Saving info for '+project_name);
             axios({
-                method: "post",
-                url: hostname+"/estimate",
+                method: "PATCH",
+                url: hostname+"/project",
                 data: {
                     client_id : client_id,
                     project_name : project_name,
@@ -349,7 +360,7 @@ var promptProjects = (client) => {
     ]
     inquirer.prompt(questions).then((answers) => {
         var project = answers.project;
-        getEstimate(client.id, project).then((project) => {
+        getProject(client.id, project).then((project) => {
             if (!project.estimate) {
                 var questions = [
                     {
@@ -360,7 +371,7 @@ var promptProjects = (client) => {
                 ]
                 inquirer.prompt(questions).then((answers) => {
                     if (answers.add_estimate) {
-                        updateEstimate(client.id, project.name).then((project) => {
+                        updateProject(client.id, project.name).then((project) => {
                             showResults(client, project);
                         });
                     } else {
