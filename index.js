@@ -57,7 +57,7 @@ var getApiKey = () => {
                     inquirer.prompt({
                         type: 'input',
                         name: 'api_key',
-                        message: 'Please enter your Toggl API key (see https://toggl.com/app/profile ):'
+                        message: 'Please enter your Toggl API key (visit "My Profile" on https://toggl.com/ ):'
                     }).then((answers) => {
                         var starterConfig = {
                             api_key: answers.api_key
@@ -392,7 +392,7 @@ var showResults = (client, project) => {
     var current_hours = (toggl_project.effort/1000/60/60);
     var percentage = (current_hours/project.estimate)*100;
     var bar = new ProgressBar({
-        schema: '╢:bar╟ :percent :current hrs/:total estimated ($:cost/$:price)',
+        schema: '╢:bar╟ :percent :current hrs/:total estimated ($:cost/$:price)\n',
         blank: '░',
         filled: '█',
         total: project.estimate
@@ -402,8 +402,7 @@ var showResults = (client, project) => {
         cost : parseFloat(current_hours*project.rate).toFixed(0),
         price : parseFloat(project.estimate*project.rate).toFixed(0)
     });
-    console.log('');
-    
+
     var questions = [
         {
             type: 'confirm',

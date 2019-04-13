@@ -4,6 +4,7 @@ const inquirer = require('inquirer')
 const ora = require('ora')
 const winston = require('winston')
 
+
 var spinner = ora();
 
 var program = require('commander');
