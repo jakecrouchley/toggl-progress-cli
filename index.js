@@ -305,7 +305,7 @@ var updateProject = (client_id, project_name) => {
             {
                 type: 'input',
                 name: 'rate',
-                message: 'Please enter an hourly rate in NZD'
+                message: 'Please enter an hourly rate in dollars'
             },
         ]
         inquirer.prompt(questions).then((answers) => {

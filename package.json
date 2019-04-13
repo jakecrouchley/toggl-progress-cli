@@ -1,6 +1,6 @@
 {
   "name": "toggl-progress-cli",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Manage Toggl progress and estimates from the command line",
   "main": "index.js",
   "scripts": {
@@ -18,7 +18,10 @@
   "keywords": [
     "toggl",
     "time",
-    "tracking"
+    "tracking",
+    "progress",
+    "estimates",
+    "budgeting"
   ],
   "author": "Jake Crouchley <jakecrouchley@gmail.com> (http://crouchley.nz)",
   "license": "ISC",
