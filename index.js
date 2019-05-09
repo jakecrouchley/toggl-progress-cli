@@ -44,7 +44,7 @@ if (process.env.NODE_ENV !== 'production') {
     }));
 };
 
-var hostname = process.env.NODE_ENV == 'production' || process.argv[2] == 'prod' ? 'https://toggl-progress.herokuapp.com' : 'http://localhost:3000';
+var hostname = process.argv[2] == 'dev' ? 'http://localhost:3000' : 'https://toggl-progress.herokuapp.com';
 var local_fs_dir_name = '.progress'
 var configDir = path.normalize(`${homedir}/${local_fs_dir_name}`)
 var togglApiKey;
@@ -113,10 +113,6 @@ var startDateQuestion = [
     }
 ]
 var run = () => {
-
-    if (process.env.NODE_ENV !== 'production' ) {
-        console.log("Running dev version connecting to "+hostname);
-    }
 
     getApiKey().then(() => {
         inquirer.prompt(startDateQuestion).then((answers) => {
