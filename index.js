@@ -398,7 +398,7 @@ var showResults = (client, project) => {
         cost : parseFloat(current_hours*project.rate).toFixed(0),
         price : parseFloat(project.estimate*project.rate).toFixed(0)
     });
-
+    console.log('\n');
     var questions = [
         {
             type: 'confirm',
