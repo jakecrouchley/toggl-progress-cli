@@ -1,6 +1,6 @@
 {
   "name": "toggl-progress-cli",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Manage Toggl progress and estimates from the command line",
   "main": "index.js",
   "scripts": {
