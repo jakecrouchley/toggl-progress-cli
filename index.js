@@ -50,44 +50,46 @@ const localFsDirName = '.progress';
 const configDir = path.normalize(`${homedir}/${localFsDirName}`);
 let togglApiKey;
 
-const getApiKey = () => new Promise((resolve, reject) => {
-  fs.readFile(`${configDir}/config.json`, (error, data) => {
-    if (error) {
-      if (error.code === 'ENOENT') {
-        inquirer.prompt({
-          type: 'input',
-          name: 'api_key',
-          message: 'Please enter your Toggl API key (visit "My Profile" on https://toggl.com/ ):',
-        }).then((answers) => {
-          const starterConfig = {
-            api_key: answers.api_key,
-          };
-          fs.mkdir(configDir, (fsMakeError) => {
-            if (fsMakeError && fsMakeError.code !== 'EEXIST') {
-              logger.error(fsMakeError);
-            } else {
-              fs.writeFile(`${configDir}/config.json`, JSON.stringify(starterConfig), { recursive: true }, (fsWriteError) => {
-                if (fsWriteError) {
-                  logger.error(fsWriteError);
-                } else {
-                  togglApiKey = answers.api_key;
-                  resolve();
-                }
-              });
-            }
+function getApiKey() {
+  return new Promise((resolve, reject) => {
+    fs.readFile(`${configDir}/config.json`, (error, data) => {
+      if (error) {
+        if (error.code === 'ENOENT') {
+          inquirer.prompt({
+            type: 'input',
+            name: 'api_key',
+            message: 'Please enter your Toggl API key (visit "My Profile" on https://toggl.com/ ):',
+          }).then((answers) => {
+            const starterConfig = {
+              api_key: answers.api_key,
+            };
+            fs.mkdir(configDir, (fsMakeError) => {
+              if (fsMakeError && fsMakeError.code !== 'EEXIST') {
+                logger.error(fsMakeError);
+              } else {
+                fs.writeFile(`${configDir}/config.json`, JSON.stringify(starterConfig), { recursive: true }, (fsWriteError) => {
+                  if (fsWriteError) {
+                    logger.error(fsWriteError);
+                  } else {
+                    togglApiKey = answers.api_key;
+                    resolve();
+                  }
+                });
+              }
+            });
           });
-        });
+        } else {
+          reject(error);
+        }
       } else {
-        reject(error);
-      }
-    } else {
       // File exists
-      const config = JSON.parse(data);
-      togglApiKey = config.api_key;
-      resolve();
-    }
+        const config = JSON.parse(data);
+        togglApiKey = config.api_key;
+        resolve();
+      }
+    });
   });
-});
+}
 
 const today = new Date();
 today.setFullYear(today.getFullYear() - 1);
@@ -125,7 +127,7 @@ const startDateQuestion = [
   },
 ];
 
-const getWorkspace = () => {
+function getWorkspace() {
   spinner.start('Loading Workspaces');
   return new Promise((resolve, reject) => {
     axios({
@@ -158,10 +160,9 @@ const getWorkspace = () => {
       reject(error);
     });
   });
-};
+}
 
-
-const getClient = (clientId, clientName, workspaceId, startDate) => {
+function getClient(clientId, clientName, workspaceId, startDate) {
   spinner.start(`Loading info for ${clientName}`);
   return new Promise((resolve, reject) => {
     axios({
@@ -184,9 +185,9 @@ const getClient = (clientId, clientName, workspaceId, startDate) => {
       reject(error);
     });
   });
-};
+}
 
-const getClients = (workspaceId, startDate) => {
+function getClients(workspaceId, startDate) {
   spinner.start('Loading Clients');
   return new Promise((resolve, reject) => {
     axios({
@@ -229,9 +230,9 @@ const getClients = (workspaceId, startDate) => {
       reject(error);
     });
   });
-};
+}
 
-const getProject = (clientId, projectName) => {
+function getProject(clientId, projectName) {
   spinner.start(`Loading info for ${projectName}`);
   return new Promise((resolve, reject) => {
     axios({
@@ -254,48 +255,50 @@ const getProject = (clientId, projectName) => {
       reject(error);
     });
   });
-};
+}
 
-const updateProject = (clientId, projectName) => new Promise((resolve, reject) => {
-  const questions = [
-    {
-      type: 'input',
-      name: 'estimate',
-      message: 'Please enter an estimate in number of hours',
-    },
-    {
-      type: 'input',
-      name: 'rate',
-      message: 'Please enter an hourly rate in dollars',
-    },
-  ];
-  inquirer.prompt(questions).then((answers) => {
-    spinner.start(`Saving info for ${projectName}`);
-    axios({
-      method: 'PATCH',
-      url: `${hostname}/project`,
-      data: {
-        clientId,
-        projectName,
-        estimate: answers.estimate,
-        rate: answers.rate,
+function updateProject(clientId, projectName) {
+  return new Promise((resolve, reject) => {
+    const questions = [
+      {
+        type: 'input',
+        name: 'estimate',
+        message: 'Please enter an estimate in number of hours',
       },
-      headers: {
-        'content-type': 'application/json',
+      {
+        type: 'input',
+        name: 'rate',
+        message: 'Please enter an hourly rate in dollars',
       },
-    }).then((response) => {
-      spinner.stop(`Saved info for ${projectName}`);
-      const project = response.data;
-      resolve(project);
-    }).catch((error) => {
-      spinner.fail(`Failed to save info for ${projectName}`);
-      logger.error(error);
-      reject(error);
+    ];
+    inquirer.prompt(questions).then((answers) => {
+      spinner.start(`Saving info for ${projectName}`);
+      axios({
+        method: 'PATCH',
+        url: `${hostname}/project`,
+        data: {
+          clientId,
+          projectName,
+          estimate: answers.estimate,
+          rate: answers.rate,
+        },
+        headers: {
+          'content-type': 'application/json',
+        },
+      }).then((response) => {
+        spinner.stop(`Saved info for ${projectName}`);
+        const project = response.data;
+        resolve(project);
+      }).catch((error) => {
+        spinner.fail(`Failed to save info for ${projectName}`);
+        logger.error(error);
+        reject(error);
+      });
     });
   });
-});
+}
 
-const promptProjects = (client) => {
+function promptProjects(client) {
   const choices = client.projects.map(project => project.name);
   const questions = [
     {
@@ -330,9 +333,9 @@ const promptProjects = (client) => {
       }
     });
   });
-};
+}
 
-const showResults = (client, project) => {
+function showResults(client, project) {
   const togglProject = client.projects.find(value => value.name === project.name);
   const currentHours = (togglProject.effort / 1000 / 60 / 60);
   const percentage = (currentHours / project.estimate) * 100;
@@ -360,10 +363,10 @@ const showResults = (client, project) => {
       run();
     }
   });
-};
+}
 
 
-const run = () => {
+function run() {
   getApiKey().then(() => {
     inquirer.prompt(startDateQuestion).then((answers) => {
       const startDate = answers.date;
@@ -399,6 +402,6 @@ const run = () => {
   }, (error) => {
     logger.error(error);
   });
-};
+}
 
 run();
