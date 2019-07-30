@@ -381,13 +381,12 @@ function initApiKey() {
           saveConfig(starterConfig).then(() => {
             getApiKey().then(() => {
               resolve();
-            }, (error) => {
-              reject(error);
+            }, (errorMessage) => {
+              reject(errorMessage);
             });
           }, () => {
             const errorMessage = 'There was an error with writing to the filesystem';
             logger.error(errorMessage);
-            console.error(errorMessage);
             reject(Error(errorMessage));
           });
         });
